@@ -1,0 +1,238 @@
+Fredrik Knapskog, numerisk øving i Elmag teori, TFY 4240
+PYTHON KODE:
+##############Blokk1
+
+import numpy as np
+import copy
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+
+
+Tilt = -13.5*np.pi/180
+R = np.float64(6.371*10**6)
+dx = 1000000
+L = 3*R
+N = int(2*L/dx)
+X = Y = Z = np.linspace(-L, L, N)
+B_0 = 3.12*10**(-5)
+B=np.zeros((N,N,N,3))
+
+
+print(N)
+
+def B_r(theta, r):
+    return -2*B_0*((R/r)**3)*np.cos(theta)
+
+def B_theta(theta, r):
+    return -1*B_0*((R/r)**3)*np.sin(theta)
+
+def B_gjengen(u, v, w):
+    M = -1*B_0*R**3
+    x, y, z = rotasjon(u, v, w)
+    r = np.float64(np.sqrt(x**2+y**2+z**2))
+    if r < R:
+        return (0,0,0)
+    return(3*M*x*z/(r**5), 3*M*y*z/(r**5), M*(3*z**2 - r**2)/(r**5))
+
+def B_gjengen2(u, v, w):
+    x, y, z = rotasjon(u, v, w)
+    r = np.float64(np.sqrt(x**2+y**2+z**2))
+    if r < R:
+        return (0,0,0)
+    theta = np.arctan2(z,np.sqrt(x**2 + y**2))
+    phi = np.arctan2(y,x)
+    B_x = B_r(theta, r)*np.sin(theta)*np.cos(phi) + B_theta(theta, r)*np.cos(theta)*np.cos(phi)
+    B_y = B_r(theta, r)*np.sin(theta)*np.sin(phi) + B_theta(theta, r)*np.cos(theta)*np.sin(phi)
+    B_z = B_r(theta, r)*np.cos(theta) - B_theta(theta, r)*np.sin(theta)
+    return (B_x, B_y, B_z)
+
+def rotasjon(x, y, z):
+    u = x*np.cos(Tilt) + z*np.sin(Tilt)
+    v = y
+    w = -1*x*np.sin(Tilt) + z*np.cos(Tilt)
+    return u, v, w
+
+BYx = np.zeros((N,N))
+BYz = np.zeros((N,N))
+
+BZx = np.zeros((N,N))
+BZy = np.zeros((N,N))
+
+
+for i in range(N):
+        for k in range(N):
+            BY = B_gjengen(X[k], 0, Z[i])
+            BZ = B_gjengen(X[k], Y[i], 1.4*R)
+            BYx[i][k] = BY[0]
+            BYz[i][k] = BY[2]
+            BZx[i][k] = BZ[0]
+            BZy[i][k] = BZ[1]
+
+############################ Blokk 2
+
+
+Xj = np.linspace(-1*R, R, 10*N)
+EarthP = np.sqrt(R**2-Xj**2)
+EarthN = -1*np.sqrt(R**2-Xj**2)
+
+plt.figure(1)
+plt.title("Magnetic field of earth")
+plt.xlabel("X (km)")
+plt.ylabel("Z (km)")
+plt.plot(Xj, EarthP)
+plt.plot(Xj, EarthN)
+plt.quiver(X,Z, BYx, BYz)
+
+plt.figure(2)
+plt.title("Magnetic field of earth")
+plt.xlabel("X (km)")
+plt.ylabel("Y (km)")
+plt.plot(Xj, EarthP)
+plt.plot(Xj, EarthN)
+plt.quiver(X,Y,BZx, BZy)
+
+
+plt.show()
+
+########################################## Blokk 3
+
+
+
+v_x_0 = np.float64(-500000)
+v_y_0 = np.float64(0)
+v_z_0 = np.float64(0)
+x_0 = np.float64(2000*R)
+y_0 = np.float64(0)
+z_0 = np.float64(0)
+V = np.sqrt(v_x_0**2 + v_y_0**2 + v_z_0**2)
+h = 100
+n=18000
+Tol = 0.001*V
+#m = np.float64(1.67*10**(-27))
+#e = np.float64(1.6*10**(-19))
+m = np.float64(9.11*10**(-31))
+e = np.float64(-1.6*10**(-19))
+c = np.float64(3*10**8)
+ifPrint = 1
+
+
+def A_m(x, y, z, v_x, v_y, v_z):
+    v = np.sqrt(v_x**2 + v_y**2 + v_z**2)
+    if v/c > 1:
+        return (-1, -1, -1)
+    C = np.sqrt(1-(v/c)**2)/m
+    M = B_gjengen(x, y, z)
+    F = e*np.array([v_y*M[2]-v_z*M[1], v_z*M[0]-v_x*M[2], v_x*M[1]-v_y*M[0]])
+    Fv = F[0]*v_x + F[1]*v_y + F[2]*v_z
+    A = [C*(F[0]-Fv*v_x/(c**2)), C*(F[1]-Fv*v_y/(c**2)), C*(F[2]-Fv*v_z/(c**2))]
+    
+    return A
+
+def k_magnetic(w):
+    cop=copy.copy(w)
+    cop[0]=w[3]
+    cop[1]=w[4]
+    cop[2]=w[5]
+ 
+    A_x, A_y, A_z = A_m(w[0],w[1],w[2],w[3],w[4],w[5])
+    if A_x == A_y == A_z == -1:
+        return np.array([-1,-1,-1,-1,-1,-1])
+
+    cop[3]=A_x
+    cop[4]=A_y
+    cop[5]=A_z
+    return cop
+    
+def f(w,h):
+    k1=k_magnetic(w)
+    k2=k_magnetic(w+h/2*k1)
+    k3=k_magnetic(w+h/2*k2)
+    k4=k_magnetic(w+h*k3)
+    if -1 in k1 or -1 in k2 or -1 in k3 or -1 in k4:
+        return f(w, 0.1*h)
+    test = w+h/6*(k1+2*k2+2*k3+k4)
+    diff = V-np.sqrt(test[3]**2+test[4]**2+test[5]**2)
+    if np.abs(diff) > Tol:
+        return f(w, 0.1*h)
+    return test, h
+
+
+    
+
+
+def numerical_algorithm(h, n, x_0, y_0, z_0, v_x_0, v_y_0, v_z_0):
+    teller = 0
+    x=np.array([x_0], dtype =np.float64)
+    y=np.array([y_0], dtype =np.float64)
+    z=np.array([z_0], dtype =np.float64)
+    Tlist=np.array([0])
+    v = np.array([np.sqrt(v_x_0**2 + v_y_0**2 + v_z_0**2)])
+    tid = np.array([0])
+    Hlist = np.array([0])
+    w=np.array([x_0, y_0, z_0, v_x_0, v_y_0, v_z_0], dtype =np.float64)
+    while (x[-1])**2 + (y[-1])**2 + (z[-1])**2 >= R**2 and teller < n:
+        w, T=f(w,h)
+        x=np.append(x,w[0])
+        y=np.append(y,w[1])
+        z=np.append(z,w[2])
+        Hlist = np.append(Hlist, T) 
+        v=np.append(v, np.sqrt((w[3])**2+(w[4])**2+(w[5])**2))
+        if teller % 10000==0:
+            print(teller)
+        teller += 1
+        tid = np.append(tid, teller)
+    return x, y, z, tid, v, np.log10(Hlist)
+
+
+x, y, z, tid, v, H= numerical_algorithm(h, n, x_0, y_0, z_0, v_x_0, v_y_0, v_z_0)
+
+
+stav = np.linspace(-5*10**9, 5*10**9, 1000)
+zstav = np.cos(-1*Tilt)*stav
+xstav = np.sin(-1*Tilt)*stav
+ystav = 0*stav
+
+
+if (ifPrint):
+    plt.figure(1)
+    plt.plot(tid, v)
+
+    fig = plt.figure(2)
+    ax = fig.gca(projection='3d')
+    ax.plot(x,y,z, color="r")
+    ax.set_xlabel('X axis')
+    ax.set_ylabel('Y axis')
+    ax.set_zlabel('Z axis')
+    ax.plot(xstav, ystav, zstav)
+
+    plt.figure(3)
+    plt.title("Electron in earth's magnetic field")
+    plt.xlabel("X (m)")
+    plt.ylabel("Z (m)")
+    plt.plot(x, z)
+    plt.plot(0,0,"o")
+    plt.plot(xstav, zstav)
+
+
+    plt.figure(4)
+    plt.title("Electron in earth's magnetic field")
+    plt.xlabel("X (m)")
+    plt.ylabel("Y (m)")
+    plt.plot(x, y)
+    plt.plot(0,0,"o")
+    
+
+    plt.figure(5)
+    plt.title("Electron in earth's magnetic field")
+    plt.xlabel("Y (m)")
+    plt.ylabel("Z (m)")
+    plt.plot(y, z)
+    plt.plot(0,0,"o")
+    plt.figure(6)
+    plt.xlabel("i")
+    plt.ylabel("h")
+    plt.plot(tid, H)
+    plt.show()
+
+
