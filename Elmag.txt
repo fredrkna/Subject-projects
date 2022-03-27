@@ -1,4 +1,4 @@
-Fredrik Knapskog, numerisk øving i Elmag teori, TFY 4240
+Fredrik Knapskog, numerisk Ã¸ving i Elmag teori, TFY 4240
 PYTHON KODE:
 ##############Blokk1
 
