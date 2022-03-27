@@ -1,0 +1,157 @@
+%matplotlib notebook
+
+#Insert chili con carne code here:
+#4.4
+
+
+import copy
+import numpy as np
+from matplotlib import pyplot as plt
+
+#Lager en funksjon som oppretter en NxN-matrise fylt med nuller.
+
+def zeroMatrix(N):
+    return np.zeros((N,N)).astype(np.int16)
+
+
+def twist(grid, punkt):
+    copyGrid = copy.copy(grid)
+    lenRow = len(grid[0])
+    monomerNr = grid[punkt[0]][punkt[1]]
+    clockwise = np.random.randint(0, 2)
+    if len(grid[0])%2:
+        lengde = (lenRow//2)+1
+    else:
+        lengde = lenRow//2
+    try:
+        if monomerNr >= lengde:
+            if clockwise:
+                for i in range(lenRow - monomerNr):
+                    xkord = np.where(grid == monomerNr + i + 1)[1][0]
+                    ykord = np.where(grid == monomerNr + i + 1)[0][0]
+                    copyGrid[ykord][xkord]=0
+                    differanse=[xkord-punkt[1],ykord-punkt[0]]
+                    copyGrid[punkt[0]+differanse[0]][punkt[1]-differanse[1]] = monomerNr + i + 1
+            elif not clockwise:
+                for i in range(lenRow - monomerNr):
+                    xkord = np.where(grid == monomerNr + i + 1)[1][0]
+                    ykord = np.where(grid == monomerNr + i + 1)[0][0]
+                    copyGrid[ykord][xkord]=0
+                    differanse=[xkord-punkt[1],ykord-punkt[0]]
+                    copyGrid[punkt[0]-differanse[0]][punkt[1]+differanse[1]] = monomerNr + i + 1
+        elif monomerNr<lengde:
+            if clockwise:
+                for i in range(monomerNr):
+                    xkord = np.where(grid == monomerNr - i - 1)[1][0]
+                    ykord = np.where(grid == monomerNr - i - 1)[0][0]
+                    copyGrid[ykord][xkord]=0
+                    differanse=[xkord-punkt[1],ykord-punkt[0]]
+                    copyGrid[punkt[0]+differanse[0]][punkt[1]-differanse[1]] = monomerNr - i - 1
+            elif not clockwise:
+                for i in range(monomerNr):
+                    xkord = np.where(grid == monomerNr - i - 1)[1][0]
+                    ykord = np.where(grid == monomerNr - i - 1)[0][0]
+                    copyGrid[ykord][xkord]=0
+                    differanse=[xkord-punkt[1],ykord-punkt[0]]
+                    copyGrid[punkt[0]-differanse[0]][punkt[1]+differanse[1]] = monomerNr - i - 1
+    except IndexError:
+        return grid,0
+    
+    return copyGrid,1
+   
+
+def validTwist(copyGrid):
+    n=len(copyGrid[0])
+    return np.count_nonzero(copyGrid)==n
+
+
+def monomerDiff(tall1, tall2):
+    
+    if tall2 == tall1 + 1:
+        return False
+    elif tall2 == tall1 - 1:
+        return False
+    elif tall1==tall2:
+        return False
+    else:
+        return True
+
+def isNeighbours(xkordI, ykordI, xkordJ, ykordJ):
+    if np.absolute(xkordI-xkordJ) == 1 and ykordI == ykordJ:
+        return True
+    elif np.absolute(ykordI-ykordJ) == 1 and xkordI == xkordJ:
+        return True
+    else:
+        return False
+    
+def NearestNeighbourMatrixAndDiameter(grid):
+    n = len(grid[0])
+    neighbourGrid = zeroMatrix(n)
+    L = 1
+    for i in range(n):
+        for j in range(n):
+            if monomerDiff(i, j):
+                xKord_i = np.where(grid == i+1)[1][0]
+                yKord_i = np.where(grid == i+1)[0][0]
+                xKord_j = np.where(grid == j+1)[1][0]
+                yKord_j = np.where(grid == j+1)[0][0]
+                if isNeighbours(xKord_i, yKord_i, xKord_j, yKord_j):
+                    neighbourGrid[i][j] = 1
+    return neighbourGrid
+
+def energyMatrix(length):
+    energyMatrix=zeroMatrix(length).astype(float)
+    for j in range(length):
+        for i in  range(length):
+            energyMatrix[i][j]=np.random.uniform(-10.4*10**(-21),-3.47*10**(-21))
+    return energyMatrix
+
+def calcEnergy(neighbourMatrix,energyMatrix):
+    energy=0
+    n=len(neighbourMatrix[0])
+    for i in range(n):
+        for j in range(n):
+            energy+=neighbourMatrix[i][j]*energyMatrix[i][j]*0.5
+    return energy
+
+
+
+def beta(T):
+    return 1/(T*1.38*10**(-23))
+
+def fluctuation(T,E_old,E_new):
+    Beta=beta(T)
+    randomNum=np.random.uniform(0,1)
+    fluctFactor=np.exp(-Beta*(E_new-E_old))
+    return randomNum<fluctFactor
+
+def main(T, T_diff, rotasjoner, n):
+
+#lager 10x10-matrise:
+    A=zeroMatrix(n)
+    E = 0
+    energiMatrise = energyMatrix(n)
+    Z = 0
+    E_sum = 0
+    for i in range(1,n+1):
+        A[n//2][i-1]=i
+    while T > 0:
+        L_temp=np.zeros(0)
+        teller = 0
+        while teller < rotasjoner:
+            monomerNr = np.random.randint(2, n)
+            xkord = np.where(A == monomerNr)[1][0]
+            ykord = np.where(A == monomerNr)[0][0]
+            copyGrid, test = twist(A, [ykord, xkord])
+            if validTwist(copyGrid) and test:
+                neighbourMatrix = NearestNeighbourMatrixAndDiameter(copyGrid)
+                E_new = calcEnergy(neighbourMatrix,energiMatrise)
+                if E_new < E or fluctuation(T,E,E_new):
+                    A=copy.copy(copyGrid)
+                    E = E_new
+                teller += 1
+#        print(T)
+        T-=T_diff   
+    print(A)
+
+main(1501, 30, 10, 15)
